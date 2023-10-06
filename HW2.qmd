@@ -26,6 +26,8 @@ chs <- merge(ind, reg, by= 'townname')
 duplicated(chs)
 ```
 
+It appears that there are no duplicate entries based on this
+
 ## 2
 
 ```{r}
@@ -46,8 +48,6 @@ chs %>%
   count(bmi)
 
 ```
-
-It appears that there are no duplicate entries based on this
 
 ## 3
 
@@ -92,27 +92,29 @@ chs %>%
 
 ## EDA Checklist
 
-1.  Check packaging
+## 1. Check packaging
 
 ```{r}
 nrow(chs)
 ncol(chs)
 ```
 
-2.  Structure of dataset
+## 2. Check structure
 
 ```{r}
 str(chs)
 ```
 
-3.  Look at the top and bottom of data:
+## Look at top and bottom
 
 ```{r}
 head(chs)
 tail(chs)
 ```
 
-3.  Check for NA's --\> I see some above, likely there are more, so I will check the variables of interest
+## Check for NAs
+
+3.   I see some above, likely there are more, so I will check the variables of interest
 
 ```{r}
 chs %>% 
@@ -176,7 +178,7 @@ ncol(chs)
 
 Dataset is now much smaller
 
-4.  Validate w external data source:
+## 4. Validate w external data source:
 
 ```{r}
 library(leaflet)
@@ -196,6 +198,8 @@ leaflet(chs) %>%
 
  
 ```
+
+I'm going to choose to validate our data based on PM2.5 because we have state wide-pm2.5 data from the dataset we used in HW1 (hope this is ok)
 
 ```{r}
 
@@ -226,9 +230,7 @@ names(hw1)[names(hw1)== "Daily Mean PM2.5 Concentration"] <- "PM"
 
 ```
 
-I'm going to choose to validate based on PM2.5 because we have state wide-pm2.5 data from the dataset we used in HW1 (hope this is ok)
-
-Above, I loaded our hw1 dataset, and looked at the townnames we have represented in our chs dataset --\> I want to only select the observations from our hw1 dataset that are matched for town (changed the variable name from site name to make this easier).
+Above, I loaded our hw1 dataset, and looked at the townnames we have represented in our chs dataset --\> I want to only select the observations from our hw1 dataset that are matched for location (changed the variable name from site name to make this easier).
 
 Wasn't sure how to select columns if I split townname into tokens and selected the columns I want based on that, so I used dplyr select
 
@@ -342,11 +344,11 @@ leaflet() %>%
   
 ```
 
-Max PM2.5 observations for both datasets are in different locations, but are in the same county (mira loma is in riverside) and very close to one another. Given this, and how closely our PM2.5 data from the chs dataset and the matched(ish) data from the state-wide recordings match, it appears that our chs data is valid enough.
+Max PM2.5 observations for both datasets are in different locations, but are in the same county (mira loma is in riverside) and very close to one another. Given this, and how closely our PM2.5 data from the chs dataset and the matched(ish) data from the state-wide recordings mirror one another, it appears that our chs data is valid enough.
 
-5.  Easy solution(s):
+## 5. Easy solution(s):
 
-    \(a\) FEV vs BMI
+\(a\) FEV vs BMI
 
 ```{r}
 
@@ -355,7 +357,7 @@ cor(chs$fev, chs$bmi, use="complete")
 chs %>%
   ggplot() + 
   geom_point(mapping = aes(x = bmi, y = fev)) +
-  geom_smooth(mapping = aes(x = bmi, y = fev)) +
+  geom_smooth(mapping = aes(x = bmi, y = fev), method = "lm") +
   theme(axis.text.x = element_text(angle = 90)) +
   labs(title = "FEV vs BMI")
 ```
@@ -382,7 +384,7 @@ ggplot(chs, aes(x=exposure, y=fev)) +
   ylab(label = "FEV1") 
 ```
 
-Varying association withe exposure; Looking at the dispersion of our data it looks like the median smoke exposure has the highest mean FEV1 compared to the other groups, which is also not congruent with clinical reality. The presence of both exposures seems to be associated with the lowest median fev1, which is consistent with clinical data. The "no exposure" group has the lowest outlier and a greater spread of data, while the smoke exposure group has only high outliers, which might be leading to the medians we observe.
+Varying association withe exposure; Looking at the dispersion of our data it looks like the median smoke exposure has the highest mean FEV1 compared to the other groups, which is also not congruent with clinical reality. The presence of both exposures seems to be associated with the lowest median fev1, which is consistent with clinical reality. The "no exposure" group has the lowest outlier and a greater spread of data, while the smoke exposure group has only high outliers, which might be leading to the medians we observe.
 
 \(c\) FEV vs PM2.5:
 
@@ -399,7 +401,7 @@ chs %>%
 
 ```
 
-Challenge solutions:
+## 6. Challenge solutions:
 
 \(a\)
 
@@ -451,7 +453,7 @@ No SS association based on linear regression, essentially the association betwee
 
 ## Visualization
 
-1\.
+## 1
 
 ```{r}
 chs$bmi_cat <- as.factor(ifelse(chs$bmi<14, '0',
@@ -466,7 +468,7 @@ ggplot(data = chs, aes(x= bmi, y = fev)) +
   facet_wrap(~townname)
 ```
 
-2\.
+## 2. 
 
 ```{r}
 ggplot(chs, aes(fill=obesity_level, y=fev, x=exposure)) +
@@ -474,7 +476,7 @@ ggplot(chs, aes(fill=obesity_level, y=fev, x=exposure)) +
     geom_bar(position="stack", stat="identity")
 ```
 
-3.  
+## 3.
 
 ```{r}
 chs %>% 
@@ -483,7 +485,7 @@ chs %>%
   labs(title = "BMI by exposure type")
 ```
 
-4\.
+## 4. 
 
 ```{r}
 chs %>% 
@@ -505,7 +507,9 @@ chs %>%
   labs(x = "BMI category", title = "FEV by BMI category with stat summaries")
 ```
 
-5.  Taken from previous EDA section\^
+5.  
+
+    ## 5. Taken from previous EDA section\^
 
 ```{r}
 
@@ -524,7 +528,7 @@ leaflet(chs) %>%
 
 ```
 
-6\.
+## 6.
 
 ```{r}
 chs %>% 

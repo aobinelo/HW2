@@ -1,0 +1,537 @@
+---
+title: "HW2"
+format: html
+editor: visual
+---
+
+## Setup
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+
+ind <- read_csv('chs_individual.csv')
+reg <- read.csv('chs_regional.csv')
+chs <- merge(ind, reg, by= 'townname')
+
+
+```
+
+## 1
+
+```{r}
+duplicated(chs)
+```
+
+## 2
+
+```{r}
+
+chs$obesity_level <- as.factor(ifelse(chs$bmi<14, 'underweight',
+                                      ifelse(chs$bmi<22, 'normal',
+                                             ifelse(chs$bmi<24, 'overweight',
+                                                    ifelse(chs$bmi<44, 'obese')))))
+
+chs %>% 
+  summarise(
+  first = min(bmi),
+  last = max(bmi)
+  )
+
+chs %>% 
+  group_by(obesity_level) %>% 
+  count(bmi)
+
+```
+
+It appears that there are no duplicate entries based on this
+
+## 3
+
+```{r}
+
+
+chs$exposure <- ifelse((chs$smoke == 1) & (chs$gasstove==1), 'both',
+                       ifelse((chs$smoke == 0) & (chs$gasstove==1), 'gas',
+                              ifelse((chs$smoke == 1) & (chs$gasstove==0), 'smoke',
+                                     ifelse((chs$smoke == 0) & (chs$gasstove==0), 'none', NA))))
+
+head(chs)
+```
+
+## 4
+
+```{r}
+
+chs %>% 
+  group_by(townname) %>% 
+  summarise(
+    FEV1 = mean(fev, na.rm=TRUE),
+    Std = sd(fev)
+  )
+
+chs %>% 
+  group_by(male) %>% 
+  summarise(
+    FEV1 = mean(fev, na.rm=TRUE))
+
+chs %>% 
+  group_by(obesity_level) %>% 
+  summarise(
+    FEV1 = mean(fev, na.rm=TRUE))
+    
+chs %>% 
+  group_by(exposure) %>% 
+  summarise(
+    FEV1 = mean(fev, na.rm=TRUE))
+
+```
+
+## EDA Checklist
+
+1.  Check packaging
+
+```{r}
+nrow(chs)
+ncol(chs)
+```
+
+2.  Structure of dataset
+
+```{r}
+str(chs)
+```
+
+3.  Look at the top and bottom of data:
+
+```{r}
+head(chs)
+tail(chs)
+```
+
+3.  Check for NA's --\> I see some above, likely there are more, so I will check the variables of interest
+
+```{r}
+chs %>% 
+  filter(is.na(agepft))%>% 
+  select(sid, height, weight, bmi)
+
+chs %>%
+  filter(is.na(weight))%>% 
+  select(sid, height, weight, bmi)
+
+chs %>%
+  filter(is.na(bmi))%>% 
+  select(sid, height, weight, bmi)
+
+chs %>%
+  filter(is.na(height))%>% 
+  select(sid, height, weight, bmi)
+
+chs %>%
+  filter(is.na(asthma))%>% 
+  select(sid, height, weight, bmi, asthma, fev, pm25_mass, exposure)%>% 
+  arrange(desc(sid))
+
+chs %>%
+  filter(is.na(fev))%>% 
+  select(sid, height, weight, bmi, fev, pm25_mass, exposure) %>% 
+  arrange(desc(sid))
+
+chs %>%
+  filter(is.na(pm25_mass))%>% 
+  select(sid, height, weight, bmi, fev, pm25_mass, exposure)%>% 
+  arrange(desc(sid))
+
+chs %>%
+  filter(is.na(exposure)) %>% 
+  select(sid, height, weight, bmi, fev, pm25_mass, exposure)%>% 
+  arrange(desc(sid))
+```
+
+The NAs in the demographic data seem to be grouped, while the not all observations missing one outcome measure are missing all the others.
+
+Simplified view of NA's found above (there are a lot in other variables we don't care about too)
+
+```{r}
+chs %>% 
+  select_if(function(x) any(is.na(x)))%>% 
+  summarise_each(funs(sum(is.na(.))))
+
+
+```
+
+I'm going to omit any observation with an NA, even the ones with just NAs in variables we don't care about
+
+```{r}
+chs <- na.omit(chs)
+
+nrow(chs)
+ncol(chs)
+
+```
+
+Dataset is now much smaller
+
+4.  Validate w external data source:
+
+```{r}
+library(leaflet)
+
+PM.pal<- colorNumeric(c('darkblue','orange','red'), domain=chs$pm25_mass)
+
+leaflet(chs) %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(lat = ~lat, lng = ~lon,
+             label = ~paste0(round(pm25_mass, 2)), color = ~ PM.pal(pm25_mass),
+             opacity = 1, fillOpacity = 1, radius = 500
+             ) %>% 
+  addLegend('bottomleft', pal=PM.pal, values=chs$pm25_mass,
+            title= "PM_25 Mass emissions", opacity = 1)
+
+
+
+ 
+```
+
+```{r}
+
+one <- read_csv('2002data.csv')
+two <- read.csv('2022data.csv')
+
+names(two)[names(two) == "Daily.Mean.PM2.5.Concentration"] <- "Daily Mean PM2.5 Concentration"
+
+names(two)[names(two) == "Site.Name"] <- "Site Name"
+
+names(two)[names(two) == "Site.ID"] <- "Site ID"
+
+one <- na.omit(one)
+two <- na.omit(two)
+
+hw1 <- rbind(one, two)
+
+chs %>% 
+  count(townname)
+
+names(hw1)[names(hw1)== "Site Name"] <- "townname"
+names(hw1)[names(hw1)== "SITE_LATITUDE"] <- "LAT"
+names(hw1)[names(hw1)== "SITE_LONGITUDE"] <- "LON"
+names(hw1)[names(hw1)== "Daily Mean PM2.5 Concentration"] <- "PM"
+
+
+
+
+```
+
+I'm going to choose to validate based on PM2.5 because we have state wide-pm2.5 data from the dataset we used in HW1 (hope this is ok)
+
+Above, I loaded our hw1 dataset, and looked at the townnames we have represented in our chs dataset --\> I want to only select the observations from our hw1 dataset that are matched for town (changed the variable name from site name to make this easier).
+
+Wasn't sure how to select columns if I split townname into tokens and selected the columns I want based on that, so I used dplyr select
+
+```{r}
+check <- hw1[grep("Alpine|Lake Elsinore|Long Beach|Mira Loma|Riverside|San Dimas|Santa Maria|Upland", hw1$townname), ]
+```
+
+Load a map of PM2.5 values for this dataset;
+
+```{r}
+
+
+library(leaflet)
+
+hw.pal<- colorNumeric(c('darkblue','orange','red'), domain=check$PM)
+
+leaflet(check) %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(lat = ~LAT, lng = ~LON,
+             label = ~paste0(round(PM,2)), color = ~ hw.pal(PM),
+             opacity = 1, fillOpacity = 1, radius = 500
+             ) %>% 
+  addLegend('bottomleft', pal=hw.pal, values=check$PM,
+            title= "PM_25 Mass emissions", opacity = 1)
+
+
+```
+
+The scale is a bit different here, but the values seem comparable to what we have for our chs data if you look at the actual #s
+
+Map the max of hw1 data to get better confirmation:
+
+```{r}
+
+meanscheck <- check %>% 
+  group_by(townname) %>% 
+  mutate(
+    mean_pm = mean(PM))
+
+meanscheck <- meanscheck %>% 
+  arrange(desc(mean_pm))
+
+maxcheck <- first(meanscheck)
+mincheck <- last(meanscheck)
+
+
+
+leaflet() %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(
+    data = maxcheck,
+    lat = ~LAT, lng = ~LON, popup = "Max PM",
+    opacity=1, fillOpacity=1, radius = 50, color = "red"
+  )
+
+
+
+```
+
+```{r}
+maxcheck %>% 
+  select(townname)
+```
+
+Max of chs data:
+
+```{r}
+
+means <- chs %>% 
+  group_by(townname) %>% 
+  mutate(
+    mean_pm = mean(pm25_mass))
+
+means <- means %>% 
+  arrange(desc(mean_pm))
+
+max <- first(means)
+min <- last(means)
+
+leaflet() %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(
+    data = max,
+    lat = ~lat, lng = ~lon, popup = "Max PM",
+    opacity=1, fillOpacity=1, radius = 50, color = "red"
+  )
+
+```
+
+```{r}
+
+max %>% 
+  select(townname)
+```
+
+```{r}
+
+leaflet() %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(
+    data = maxcheck,
+    lat = ~LAT, lng = ~LON, popup = "HW1 Max PM",
+    opacity=1, fillOpacity=1, radius = 50, color = "red"
+  ) %>%
+  addCircles(
+    data = max,
+    lat = ~lat, lng = ~lon, popup = "CHS Max PM",
+    opacity=1, fillOpacity=1, radius = 50, color = "red"
+  ) 
+  
+  
+```
+
+Max PM2.5 observations for both datasets are in different locations, but are in the same county (mira loma is in riverside) and very close to one another. Given this, and how closely our PM2.5 data from the chs dataset and the matched(ish) data from the state-wide recordings match, it appears that our chs data is valid enough.
+
+5.  Easy solution(s):
+
+    \(a\) FEV vs BMI
+
+```{r}
+
+cor(chs$fev, chs$bmi, use="complete")
+
+chs %>%
+  ggplot() + 
+  geom_point(mapping = aes(x = bmi, y = fev)) +
+  geom_smooth(mapping = aes(x = bmi, y = fev)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title = "FEV vs BMI")
+```
+
+Moderate positive correlation between BMI and FEV
+
+\(b\) Exposure vs FEV
+
+```{r}
+library(broom)
+library(ggpubr)
+
+chs$exposurecat <- ifelse((chs$smoke == 1) & (chs$gasstove==1), 3,
+                       ifelse((chs$smoke == 0) & (chs$gasstove==1), 2,
+                              ifelse((chs$smoke == 1) & (chs$gasstove==0), 1,
+                                     ifelse((chs$smoke == 0) & (chs$gasstove==0), 0, NA))))
+ 
+
+
+ggplot(chs, aes(x=exposure, y=fev)) +
+  geom_boxplot(outlier.colour='red') +
+  coord_cartesian() +
+  xlab(label = "exposure") +
+  ylab(label = "FEV1") 
+```
+
+Varying association withe exposure; Looking at the dispersion of our data it looks like the median smoke exposure has the highest mean FEV1 compared to the other groups, which is also not congruent with clinical reality. The presence of both exposures seems to be associated with the lowest median fev1, which is consistent with clinical data. The "no exposure" group has the lowest outlier and a greater spread of data, while the smoke exposure group has only high outliers, which might be leading to the medians we observe.
+
+\(c\) FEV vs PM2.5:
+
+```{r}
+
+cor(chs$fev, chs$pm25_mass, use="complete")
+
+chs %>%
+  ggplot() + 
+  geom_point(mapping = aes(x = pm25_mass, y = fev)) +
+  geom_smooth(mapping = aes(x = pm25_mass, y = fev)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title = "FEV vs PM2.5")
+
+```
+
+Challenge solutions:
+
+\(a\)
+
+```{r}
+
+lmfevbmi = lm(fev~bmi, data = chs) 
+summary(lmfevbmi)
+```
+
+Positive correlation between BMI and FEV; each level increase in BMI is associated with a 28.59x increase in FEV (within our datarange).
+
+\(b\)
+
+```{r}
+group_by(chs, exposurecat) %>%
+  summarise(
+    count = n(),
+    mean = mean(pm25_mass, na.rm = TRUE),
+    sd = sd(pm25_mass, na.rm = TRUE),
+    median = median(pm25_mass, na.rm = TRUE),
+    IQR = IQR(pm25_mass, na.rm = TRUE)
+  )
+
+
+```
+
+Looking at the statistics, the variation between observation count is probably what gave us our weird results (the means make even less sense than the medians)
+
+Confirm SS diff between groups w KW test (non-parametric), then do multiple level comparisons to find which group(/s) is SS from the rest (if there is a diff):
+
+```{r}
+library(ggpubr)
+kruskal.test(fev ~ exposurecat, data = chs)
+```
+
+No SS difference between fev based on exposure category ---\> can't make any conclusions about fev based on exposure category from chs data which is good bc the trend we were seeing was clinically suspect.
+
+Could also do a linear regression to here since I made exposure categorical, but since there is no SS diff between our groups, testing a linear model wouldn't tell us anything
+
+\(c\)
+
+```{r}
+lmfevpm = lm(fev~pm25_mass, data = chs) 
+summary(lmfevpm)
+
+```
+
+No SS association based on linear regression, essentially the association between FEV and PM25_mass is 0 and we also cannot make any conclusions on FEV from PM_25 based on a linear model of our data.
+
+## Visualization
+
+1\.
+
+```{r}
+chs$bmi_cat <- as.factor(ifelse(chs$bmi<14, '0',
+                                        ifelse(chs$bmi<22, '1',
+                                             ifelse(chs$bmi<24, '2',
+                                                    ifelse(chs$bmi<44, '3')))))
+
+ggplot(data = chs, aes(x= bmi, y = fev)) +
+  geom_point(data = chs, aes(x= bmi, y = fev, color = obesity_level)) +
+  geom_smooth(method = "lm") +
+  labs(y = "fev", x = "categorical bmi", title = "FEV by BMI") +
+  facet_wrap(~townname)
+```
+
+2\.
+
+```{r}
+ggplot(chs, aes(fill=obesity_level, y=fev, x=exposure)) +
+  scale_fill_viridis_d() +
+    geom_bar(position="stack", stat="identity")
+```
+
+3.  
+
+```{r}
+chs %>% 
+  ggplot(aes(x = exposure, y = bmi)) +
+  geom_bar(stat = "identity") + 
+  labs(title = "BMI by exposure type")
+```
+
+4\.
+
+```{r}
+chs %>% 
+  ggplot(aes(x = exposurecat, y = fev, fill = exposure)) +
+  scale_fill_manual(
+    values = c("red","orange","green","yellow")
+  ) +
+  stat_summary(fun.data = "mean_sdl", geom = "bar", position = "dodge") +
+  stat_summary(fun.data = "mean_sdl", geom = "errorbar", position = "dodge", width = 0.5) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "exposure category", title = "FEV by exposure category with stat summaries")
+
+chs %>% 
+  ggplot(aes(x = bmi_cat, y = fev, fill = obesity_level)) +
+  scale_fill_viridis_d() +
+  stat_summary(fun.data = "mean_sdl", geom = "bar", position = "dodge") +
+  stat_summary(fun.data = "mean_sdl", geom = "errorbar", position = "dodge", width = 0.5) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "BMI category", title = "FEV by BMI category with stat summaries")
+```
+
+5.  Taken from previous EDA section\^
+
+```{r}
+
+library(leaflet)
+
+PM.pal<- colorNumeric(c('darkblue','orange','red'), domain=chs$pm25_mass)
+
+leaflet(chs) %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(lat = ~lat, lng = ~lon,
+             label = ~paste0(round(pm25_mass, 2)), color = ~ PM.pal(pm25_mass),
+             opacity = 1, fillOpacity = 1, radius = 500
+             ) %>% 
+  addLegend('bottomleft', pal=PM.pal, values=chs$pm25_mass,
+            title= "PM_25 Mass emissions", opacity = 1)
+
+```
+
+6\.
+
+```{r}
+chs %>% 
+  ggplot(aes(x= pm25_mass, y = fev, color = townname)) +
+           geom_point() +
+           labs(y = "fev", x = "PM2.5 Index", title = "FEV by PM2.5") 
+
+
+```
+
+It does not appear that FEV is associated with PM2.5, likely other variables present in our data act as confounders, and we would need to create a model that accounts for all these other variables.
